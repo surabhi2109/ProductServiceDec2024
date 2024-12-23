@@ -1,10 +1,16 @@
 package com.example.product.services.impl;
 
 import com.example.product.dtos.FakeStoreProductDTO;
+import com.example.product.exceptions.ProductNotFoundException;
 import com.example.product.models.Category;
 import com.example.product.models.Product;
 import com.example.product.services.ProductService;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpMessageConverterExtractor;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -20,8 +26,9 @@ public class FakeAPIProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Product getProductById(long id) {
+    public Product getProductById(long id) throws ProductNotFoundException{
         FakeStoreProductDTO dto = restTemplate.getForObject("https://fakestoreapi.com/products/"+id, FakeStoreProductDTO.class);
+        if(dto==null)throw new ProductNotFoundException(100L,id);
         return convertToProduct(dto);
     }
 
@@ -45,16 +52,54 @@ public class FakeAPIProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Product deleteProductById(long id) {
-        Product deletedProduct = getProductById(id);
+    public void deleteProductById(long id) throws ProductNotFoundException{
+        //Product deletedProduct = getProductById(id);
         restTemplate.delete("https://fakestoreapi.com/products/"+id);
-        return deletedProduct;
+        //return deletedProduct;
+    }
+
+    public Product updateProductOld(long id, Product updatedProduct){
+        restTemplate.put("https://fakestoreapi.com/products/"+id, updatedProduct);
+        getProductById(updatedProduct.getId());
+        return updatedProduct;
     }
 
     public Product updateProduct(long id, Product updatedProduct){
-        restTemplate.put("https://fakestoreapi.com/products/"+id, updatedProduct);
-        updatedProduct.setId(id);
-        return updatedProduct;
+        FakeStoreProductDTO fakeStoreProductDTO =
+                //convertToDto(updatedProduct)
+                new FakeStoreProductDTO();
+        fakeStoreProductDTO.setId(updatedProduct.getId());
+        fakeStoreProductDTO.setTitle(updatedProduct.getTitle());
+        fakeStoreProductDTO.setDescription(updatedProduct.getDescription());
+        RequestCallback requestCallback = restTemplate.httpEntityCallback(fakeStoreProductDTO,FakeStoreProductDTO.class);
+        ResponseExtractor<ResponseEntity<FakeStoreProductDTO>> responseExtractor = restTemplate.responseEntityExtractor(FakeStoreProductDTO.class);
+        FakeStoreProductDTO receivedFakeStoreProductDTO =
+                restTemplate
+                        .execute("https://fakestoreapi.com/products/"+id, HttpMethod.PUT, requestCallback, responseExtractor)
+                        .getBody();
+        return convertToProduct(receivedFakeStoreProductDTO);
+    }
+
+    @Override
+    public Product patchProduct(long id, Product updatedProduct) {
+
+        FakeStoreProductDTO fakeStoreProductDTO =
+                //convertToDto(updatedProduct)
+                new FakeStoreProductDTO();
+        fakeStoreProductDTO.setId(updatedProduct.getId());
+        fakeStoreProductDTO.setTitle(updatedProduct.getTitle());
+        fakeStoreProductDTO.setDescription(updatedProduct.getDescription());
+
+        RequestCallback requestCallback = restTemplate.httpEntityCallback(fakeStoreProductDTO, FakeStoreProductDTO.class);
+        HttpMessageConverterExtractor<FakeStoreProductDTO> responseExtractor =
+                new HttpMessageConverterExtractor<>(FakeStoreProductDTO.class, restTemplate.getMessageConverters());
+        //not working --> java.net.ProtocolException: Invalid HTTP method: PATCH
+        FakeStoreProductDTO receivedFakeStoreProductDTO =
+                restTemplate
+                        .execute("https://fakestoreapi.com/products/"+id, HttpMethod.PATCH, requestCallback, responseExtractor);
+
+
+        return convertToProduct(receivedFakeStoreProductDTO);
     }
 
     private Product convertToProduct(FakeStoreProductDTO dto) {

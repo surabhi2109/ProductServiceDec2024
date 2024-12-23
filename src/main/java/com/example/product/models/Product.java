@@ -1,5 +1,8 @@
 package com.example.product.models;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,10 +11,11 @@ import org.springframework.stereotype.Service;
 
 @Getter
 @Setter
-public class Product {
-    private long id;
-    private String title;
+@Entity
+public class Product extends BaseModel {
     private Double price;
+    @ManyToOne
+    //@JoinColumn(name = "category_id")
     private Category category;
     private String description;
 }
